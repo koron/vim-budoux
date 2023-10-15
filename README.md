@@ -13,3 +13,4 @@
 
 * The models are copied from <https://github.com/google/budoux/tree/main/budoux/models>
 * JSON model files are formated
+* [Original BudouX demo site](https://google.github.io/budoux/)
