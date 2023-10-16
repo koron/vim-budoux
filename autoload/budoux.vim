@@ -30,7 +30,7 @@ function! budoux#load_model(path)
       endfor
     endif
   endfor
-  let model.base_score = -sum / 2
+  let model.base_score = sum / 2
   let model.parse = function('s:ModelParse')
   return model
 endfunction
@@ -43,6 +43,34 @@ function! budoux#load_japanese_model()
   return budoux#load_model(budoux#model_path('ja.json'))
 endfunction
 
+function! budoux#score(model, chars, i)
+  let last = len(a:chars)
+  let v = {}
+
+  let v.UW1 = a:i   > 2    ? a:model.UW1->get(a:chars[a:i-3], 0) : 0
+  let v.UW2 = a:i   > 1    ? a:model.UW2->get(a:chars[a:i-2], 0) : 0
+  let v.UW3 =                a:model.UW3->get(a:chars[a:i-1], 0)
+  let v.UW4 =                a:model.UW4->get(a:chars[a:i  ], 0)
+  let v.UW5 = a:i+1 < last ? a:model.UW5->get(a:chars[a:i+1], 0) : 0
+  let v.UW6 = a:i+2 < last ? a:model.UW6->get(a:chars[a:i+2], 0) : 0
+
+  let v.BW1 = a:i   > 2    ? a:model.BW1->get(join(a:chars[a:i-2 : a:i  ]), 0) : 0
+  let v.BW2 = a:i   > 1    ? a:model.BW2->get(join(a:chars[a:i-1 : a:i+1]), 0) : 0
+  let v.BW3 = a:i+1 < last ? a:model.BW3->get(join(a:chars[a:i   : a:i+2]), 0) : 0
+
+  let v.TW1 = a:i   > 2    ? a:model.TW1->get(join(a:chars[a:i-3 : a:i  ]), 0) : 0
+  let v.TW2 = a:i   > 1    ? a:model.TW2->get(join(a:chars[a:i-2 : a:i+1]), 0) : 0
+  let v.TW3 = a:i+1 < last ? a:model.TW3->get(join(a:chars[a:i-1 : a:i+2]), 0) : 0
+  let v.TW4 = a:i+2 < last ? a:model.TW4->get(join(a:chars[a:i   : a:i+3]), 0) : 0
+
+  let total = 0
+  for w in v->values()
+    let total += w
+  endfor
+  let v._total = total
+  return v
+endfunction
+
 function! budoux#parse(model, str)
   let chars = split(a:str, '\zs')
   if len(chars) == 0
@@ -51,45 +79,8 @@ function! budoux#parse(model, str)
   let chunks = [chars[0]]
   let last = len(chars)
   for i in range(1, last - 1)
-    let v = a:model.base_score
-
-    if i > 2
-      let v += a:model.UW1->get(chars[i-3], 0)
-    endif
-    if i > 1
-      let v += a:model.UW2->get(chars[i-2], 0)
-    endif
-    let v += a:model.UW3->get(chars[i-1], 0)
-    let v += a:model.UW4->get(chars[i], 0)
-    if i + 1 < last
-      let v += a:model.UW5->get(chars[i+1], 0)
-    endif
-    if i + 2 < last
-      let v += a:model.UW5->get(chars[i+2], 0)
-    endif
-
-    if i > 1
-      let v += a:model.BW1->get(join(chars[i-2:i], ''), 0)
-    endif
-    let v += a:model.BW2->get(join(chars[i-1:i+1], ''), 0)
-    if i + 1 < last
-      let v += a:model.BW3->get(join(chars[i:i+2], ''), 0)
-    endif
-
-    if i > 2
-      let v += a:model.TW1->get(join(chars[i-3:i], ''), 0)
-    endif
-    if i > 1
-      let v += a:model.TW2->get(join(chars[i-2:i+1], ''), 0)
-    endif
-    if i + 1 < last
-      let v += a:model.TW3->get(join(chars[i-1:i+2], ''), 0)
-    endif
-    if i + 2 < last
-      let v += a:model.TW4->get(join(chars[i:i+3], ''), 0)
-    endif
-
-    if v > 0
+    let v = budoux#score(a:model, chars, i)
+    if v._total > a:model.base_score
       call add(chunks, chars[i])
     else
       let chunks[-1] .= chars[i]
